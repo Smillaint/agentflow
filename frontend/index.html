@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgentFlow Console</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">AF</div>
+          <div>
+            <h1>AgentFlow</h1>
+            <p data-i18n="subtitle">RAG Agent Console</p>
+          </div>
+        </div>
+
+        <section class="panel compact">
+          <div class="panel-title">
+            <span data-i18n="runtime">Runtime</span>
+            <button id="refreshStats" class="icon-button" title="Refresh runtime">R</button>
+          </div>
+          <dl class="stats-list">
+            <div>
+              <dt data-i18n="status">Status</dt>
+              <dd id="healthStatus">Loading</dd>
+            </div>
+            <div>
+              <dt data-i18n="model">Model</dt>
+              <dd id="modelName">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="provider">Provider</dt>
+              <dd id="providerName">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="llm">LLM</dt>
+              <dd id="llmStatus">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="chunks">Chunks</dt>
+              <dd id="chunkCount">-</dd>
+            </div>
+            <div>
+              <dt data-i18n="tools">Tools</dt>
+              <dd id="toolList">-</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="panel compact">
+          <div class="panel-title">
+            <span data-i18n="recentRuns">Recent Runs</span>
+            <button id="refreshTraces" class="icon-button" title="Refresh traces">R</button>
+          </div>
+          <div id="traceList" class="trace-list"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <section class="query-band">
+          <div class="query-head">
+            <div>
+              <h2 data-i18n="runAgent">Run Agent</h2>
+              <p data-i18n="runHint">Ask against the local knowledge base and inspect the execution trace.</p>
+            </div>
+            <div class="top-actions">
+              <select id="languageSelect" class="language-select" title="Language">
+                <option value="en">English</option>
+                <option value="zh">中文</option>
+              </select>
+              <a class="docs-link" href="/docs" target="_blank" rel="noreferrer" data-i18n="apiDocs">API Docs</a>
+            </div>
+          </div>
+
+          <form id="agentForm" class="query-form">
+            <textarea id="queryInput" name="query" rows="4">What capabilities are included in AgentFlow stage one?</textarea>
+            <div class="form-row">
+              <label>
+                <span data-i18n="topK">Top K</span>
+                <input id="topKInput" type="number" min="1" max="20" value="4" />
+              </label>
+              <button id="runButton" type="submit" data-i18n="runButton">Run Agent</button>
+            </div>
+          </form>
+
+          <div class="sample-row">
+            <button class="sample-button" data-key="sampleStageOne" data-query-en="What capabilities are included in AgentFlow stage one?" data-query-zh="AgentFlow 第一阶段包含哪些能力？">Stage one</button>
+            <button class="sample-button" data-key="sampleStageTwo" data-query-en="What did stage two add?" data-query-zh="AgentFlow 第二阶段新增了什么？">Stage two</button>
+            <button class="sample-button" data-key="sampleStats" data-query-en="Show knowledge base stats" data-query-zh="统计当前知识库">Stats</button>
+          </div>
+        </section>
+
+        <section class="metrics-grid">
+          <div class="metric">
+            <span data-i18n="totalTokens">Total Tokens</span>
+            <strong id="totalTokens">-</strong>
+          </div>
+          <div class="metric">
+            <span data-i18n="estimatedCost">Estimated Cost</span>
+            <strong id="estimatedCost">-</strong>
+          </div>
+          <div class="metric">
+            <span data-i18n="runId">Run ID</span>
+            <strong id="runId">-</strong>
+          </div>
+        </section>
+
+        <section class="result-grid">
+          <article class="panel answer-panel">
+            <div class="panel-title">
+              <span data-i18n="answer">Answer</span>
+              <span id="answerState" class="state-pill">Idle</span>
+            </div>
+            <div id="answerOutput" class="answer-output" data-i18n="emptyAnswer">Run the agent to see a grounded answer.</div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title">
+              <span data-i18n="sources">Sources</span>
+              <span id="sourceCount" class="muted">0</span>
+            </div>
+            <div id="sourcesOutput" class="source-list"></div>
+          </article>
+
+          <article class="panel trace-panel">
+            <div class="panel-title">
+              <span data-i18n="trace">Trace</span>
+              <span id="traceCount" class="muted">0 steps</span>
+            </div>
+            <div id="traceOutput" class="trace-output"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

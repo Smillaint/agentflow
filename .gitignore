@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+data/
+!data/
+data/*
+!data/knowledge/
+data/knowledge/*
+!data/knowledge/.gitkeep
+vectorstore/
+runs/

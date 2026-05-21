@@ -1,0 +1,2 @@
+{"question":"What capabilities are included in AgentFlow stage one?","expected_tool":"search_knowledge_base","expected_keywords":["BM25","trace","search_knowledge_base"]}
+{"question":"Show knowledge base stats","expected_tool":"get_corpus_stats","expected_keywords":["chunk_count","source_count"]}
