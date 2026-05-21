@@ -1,150 +1,190 @@
-# AgentFlow MVP
+# AgentFlow MVP 中文说明
 
-AgentFlow is a resume-oriented local RAG + tool-calling Agent project. The goal is not a simple chatbot demo, but a testable Agent backend with traceability, evaluation, usage accounting, and a small operations console.
+AgentFlow 是一个面向简历项目的本地 RAG + 工具调用 Agent 项目,是一个带检索、工具调用、trace、评测、成本统计和前端控制台的 Agent 后端原型。
 
-Chinese documentation: [README.zh-CN.md](README.zh-CN.md)
+## 当前能力
 
-## Capabilities
 
-Stage 1:
+- 加载本地知识库文件。
+- 使用 BM25 做关键词检索。
+- 通过 `ToolRegistry` 统一管理工具。
+- 单 Agent 工作流：规划、工具调用、答案生成、trace 输出。
+- FastAPI 接口：`/health`、`/stats`、`/agent`。
 
-- Local knowledge loading for `.txt`, `.md`, `.py`, `.json`, `.csv`, `.log`, and `.pdf`.
-- BM25 retrieval with source metadata.
-- Tool calling through a central `ToolRegistry`.
-- Single-Agent workflow with planning, tool execution, answer generation, trace output, and sources.
-- FastAPI endpoints for `/health`, `/stats`, `/agent`.
-- Core tests that do not require an external LLM.
+- 每次运行保存 JSONL trace。
+- 支持自动评测 eval cases。
+- 工具失败自动重试，并记录每次 attempt。
+- 统计 token 和估算成本。
+- `/traces` 查看最近运行记录。
 
-Stage 2:
+- FastAPI 托管前端控制台。
+- 前端支持提问、查看答案、sources、trace、usage 和最近运行。
+- 支持中文 / 英文界面切换。
+- 显示当前模型、模型提供方和 LLM 是否启用。
 
-- JSONL trace persistence with `run_id`, query, answer, trace, sources, and usage.
-- Eval runner with JSONL cases, expected tool checks, keyword checks, and pass rate.
-- Tool failure retry with every attempt recorded in trace.
-- Token and estimated cost accounting.
-- `/traces` endpoint for recent run inspection.
 
-Stage 3:
-
-- Static web console served by FastAPI at `/`.
-- Query form, runtime stats, answer panel, sources panel, trace viewer, usage metrics, and recent runs.
-- `/docs` remains available as the FastAPI API debugger.
-- Runtime model panel showing provider, model, LLM status, and token/cost usage.
-- English / Chinese UI switch in the web console.
-
-## Project Structure
+### 推荐目录
 
 ```text
-frontend/
-  index.html     Agent console shell
-  styles.css     Responsive operations UI
-  app.js         API client and render logic
-src/
-  agent.py       Single-Agent workflow
-  cost.py        Token and cost estimation
-  evaluate.py    Eval runner
-  generator.py   Local fallback and OpenAI-compatible generation
-  loader.py      Local file loading and chunking
-  retriever.py   BM25 retrieval
-  schema.py      Core data structures
-  tools.py       Tool registry and built-in tools
-  tracing.py     JSONL trace persistence
-main.py          CLI entry
-server.py        FastAPI service and frontend hosting
-examples/        Demo knowledge base and eval cases
-tests/           Unit tests
-docs/            Architecture notes
+data/
+  knowledge/
+    your-doc.md
+    notes.txt
+    api.json
+    paper.pdf
 ```
 
-## Run From CLI
+### 默认示例目录
 
-```powershell
-python main.py --data-dir .\examples\knowledge "What capabilities are included in AgentFlow stage one?"
-```
-
-For real local knowledge files, put them under:
+如果不指定目录，项目默认读取：
 
 ```text
-data/knowledge
+examples/knowledge
 ```
 
-Then run:
 
-```powershell
-python main.py --data-dir .\data\knowledge "your question"
-```
+### 支持的文件类型
 
-Supported local knowledge file types:
+当前支持这些文件：
 
 ```text
-.txt .md .py .json .csv .log .pdf
+.txt
+.md
+.py
+.json
+.csv
+.log
+.pdf
 ```
 
-PDF parsing uses PyMuPDF, included in `requirements.txt` as `pymupdf`.
+## 如何指定知识库目录？
 
-Show trace:
+### CLI 运行
 
 ```powershell
-python main.py --show-trace --data-dir .\examples\knowledge "Show knowledge base stats"
+python main.py --data-dir .\data\knowledge "AgentFlow 是什么项目"
 ```
 
-## Run The Web Console
-
-Install API dependencies:
+查看完整 trace：
 
 ```powershell
-pip install -r requirements.txt
+python main.py --show-trace --data-dir .\data\knowledge "统计当前知识库"
 ```
 
-Start the service on your available port:
+### Web 服务运行
+
+启动服务前设置环境变量,8010只是一个示例端口,换成空闲端口即可：
 
 ```powershell
+$env:AGENT_DATA_DIR=".\data\knowledge"
 python -m uvicorn server:app --host 127.0.0.1 --port 8010
 ```
 
-Open:
+然后打开：
 
 ```text
 http://127.0.0.1:8010/
 ```
 
-The console can switch between English and Chinese from the language selector in the top-right toolbar.
+### 写入 `.env`
 
-API docs:
+也可以在项目根目录 `.env` 里加：
+
+```text
+AGENT_DATA_DIR=./data/knowledge
+```
+
+之后直接启动：
+
+```powershell
+python -m uvicorn server:app --host 127.0.0.1 --port 8010
+```
+
+## 大模型配置
+
+`.env` 使用 OpenAI-compatible 风格变量：
+
+```text
+OPENAI_API_KEY=key
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-chat
+```
+
+如果 `OPENAI_BASE_URL` 是 `https://api.deepseek.com`，项目会识别为 DeepSeek,其余api请填写对应官网
+
+如果模型调用失败，系统不会直接崩溃，而是：
+
+1. 回退到本地 extractive answer。
+2. 在 trace 里记录 `answer_generator` 错误步骤。
+3. 前端仍然能看到 sources、trace 和 usage。
+
+## 启动前端控制台
+
+安装依赖：
+
+```powershell
+pip install -r requirements.txt
+```
+
+启动服务：
+
+```powershell
+python -m uvicorn server:app --host 127.0.0.1 --port 8010
+```
+
+打开：
+
+```text
+http://127.0.0.1:8010/
+```
+
+接口文档：
 
 ```text
 http://127.0.0.1:8010/docs
 ```
 
-## Optional LLM Configuration
+## 测试和评测
 
-Without an API key, AgentFlow uses a local extractive fallback. To enable DeepSeek, OpenAI, or another OpenAI-compatible API:
-
-```text
-OPENAI_API_KEY=your_key
-OPENAI_BASE_URL=https://api.deepseek.com
-OPENAI_MODEL=deepseek-chat
-```
-
-AgentFlow detects the provider from `OPENAI_BASE_URL` and `OPENAI_MODEL`. With `https://api.deepseek.com` and `deepseek-chat`, the UI will show provider `deepseek`.
-
-If the model request fails, AgentFlow falls back to the local extractive answer and records the model error in trace as an `answer_generator` step.
-
-## Evaluation
-
-Run tests:
+运行单测：
 
 ```powershell
 python -m unittest discover -s tests
 ```
 
-Run eval cases:
+运行评测：
 
 ```powershell
 python -m src.evaluate --eval-file .\examples\eval_questions.jsonl
 ```
 
-Write an eval report:
+生成评测报告：
 
 ```powershell
 python -m src.evaluate --report-file .\runs\eval_report.json
+```
+
+## 目录结构
+
+```text
+frontend/
+  index.html      前端页面
+  styles.css      页面样式
+  app.js          前端接口调用和渲染逻辑
+src/
+  agent.py        单 Agent 工作流
+  cost.py         token 和成本估算
+  evaluate.py     自动评测
+  generator.py    本地 fallback + 大模型生成
+  loader.py       本地文件加载和切分，包含 PDF 解析
+  retriever.py    BM25 检索
+  schema.py       核心数据结构
+  tools.py        工具注册和内置工具
+  tracing.py      JSONL trace 持久化
+main.py           CLI 入口
+server.py         FastAPI 服务和前端托管
+examples/         示例知识库和 eval cases
+tests/            单元测试
+docs/             架构文档
+data/             本地知识库，已被 Git 忽略
 ```
