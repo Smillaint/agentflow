@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from src.agent import AgentConfig, SingleAgent
 from src.generator import AnswerGenerator
 from src.loader import load_knowledge_base
-from src.retriever import BM25Retriever
+from src.retriever import HybridRetriever
 from src.schema import ToolResult
 from src.tools import build_default_registry
 
@@ -14,7 +14,7 @@ from src.tools import build_default_registry
 class AgentWorkflowTest(unittest.TestCase):
     def build_agent(self) -> SingleAgent:
         chunks = load_knowledge_base("./examples/knowledge")
-        retriever = BM25Retriever(chunks)
+        retriever = HybridRetriever(chunks)
         registry = build_default_registry(chunks, retriever)
         return SingleAgent(
             registry,
@@ -29,6 +29,11 @@ class AgentWorkflowTest(unittest.TestCase):
         self.assertTrue(result["answer"])
         self.assertEqual(result["trace"][0]["tool"], "search_knowledge_base")
         self.assertGreaterEqual(len(result["sources"]), 1)
+        self.assertEqual(
+            result["trace"][0]["result"]["output"]["retrieval_mode"],
+            "hybrid_bm25_ngram_tfidf",
+        )
+        self.assertIn("score_details", result["sources"][0])
         self.assertIn("usage", result)
 
     def test_stats_workflow_uses_stats_tool(self):
@@ -43,7 +48,7 @@ class AgentWorkflowTest(unittest.TestCase):
 
     def test_trace_persistence_adds_run_metadata(self):
         chunks = load_knowledge_base("./examples/knowledge")
-        retriever = BM25Retriever(chunks)
+        retriever = HybridRetriever(chunks)
         registry = build_default_registry(chunks, retriever)
         with TemporaryDirectory() as trace_dir:
             agent = SingleAgent(
@@ -55,6 +60,9 @@ class AgentWorkflowTest(unittest.TestCase):
 
             self.assertIn("run_id", result)
             self.assertIn("trace_path", result)
+            saved = agent.trace_store.get(result["run_id"])
+            self.assertIsNotNone(saved)
+            self.assertEqual(saved["query"], "AgentFlow capabilities")
 
     def test_failed_tool_is_retried(self):
         class FlakyRegistry:
@@ -98,7 +106,7 @@ class AgentWorkflowTest(unittest.TestCase):
             chat = type("Chat", (), {"completions": BrokenCompletions()})()
 
         chunks = load_knowledge_base("./examples/knowledge")
-        retriever = BM25Retriever(chunks)
+        retriever = HybridRetriever(chunks)
         registry = build_default_registry(chunks, retriever)
         agent = SingleAgent(
             registry,

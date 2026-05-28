@@ -4,7 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from src.retriever import BM25Retriever
 from src.schema import DocumentChunk, ToolResult
 
 
@@ -49,7 +48,11 @@ def _as_int(value: Any, default: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, number))
 
 
-def _source_payload(chunk: DocumentChunk, score: float | None = None) -> dict[str, Any]:
+def _source_payload(
+    chunk: DocumentChunk,
+    score: float | None = None,
+    details: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     payload = {
         "source": chunk.metadata.get("source"),
         "chunk_id": chunk.metadata.get("chunk_id"),
@@ -61,10 +64,12 @@ def _source_payload(chunk: DocumentChunk, score: float | None = None) -> dict[st
     }
     if score is not None:
         payload["score"] = round(score, 4)
+    if details:
+        payload["score_details"] = details
     return payload
 
 
-def build_default_registry(chunks: list[DocumentChunk], retriever: BM25Retriever) -> ToolRegistry:
+def build_default_registry(chunks: list[DocumentChunk], retriever) -> ToolRegistry:
     registry = ToolRegistry()
 
     def search_knowledge_base(arguments: dict[str, Any]) -> ToolResult:
@@ -82,7 +87,15 @@ def build_default_registry(chunks: list[DocumentChunk], retriever: BM25Retriever
             output={
                 "query": query,
                 "top_k": top_k,
-                "sources": [_source_payload(item.chunk, item.score) for item in results],
+                "retrieval_mode": (
+                    results[0].details.get("retrieval_mode")
+                    if results and results[0].details
+                    else "unknown"
+                ),
+                "sources": [
+                    _source_payload(item.chunk, item.score, item.details)
+                    for item in results
+                ],
             },
         )
 
@@ -100,7 +113,7 @@ def build_default_registry(chunks: list[DocumentChunk], retriever: BM25Retriever
     registry.register(
         ToolSpec(
             name="search_knowledge_base",
-            description="Search local knowledge chunks with BM25 retrieval.",
+            description="Search local knowledge chunks with hybrid BM25 and n-gram TF-IDF retrieval.",
             parameters={"query": "string", "top_k": "integer"},
             handler=search_knowledge_base,
         )
@@ -114,4 +127,3 @@ def build_default_registry(chunks: list[DocumentChunk], retriever: BM25Retriever
         )
     )
     return registry
-

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,7 @@ from main import load_local_env
 from src.agent import AgentConfig, SingleAgent
 from src.generator import build_generator
 from src.loader import load_knowledge_base
-from src.retriever import BM25Retriever
+from src.retriever import HybridRetriever
 from src.tools import build_default_registry
 
 
@@ -34,7 +35,7 @@ def build_agent(args) -> SingleAgent:
         chunk_size=args.chunk_size,
         chunk_overlap=args.chunk_overlap,
     )
-    retriever = BM25Retriever(chunks)
+    retriever = HybridRetriever(chunks)
     registry = build_default_registry(chunks, retriever)
     return SingleAgent(
         registry,
@@ -49,7 +50,9 @@ def build_agent(args) -> SingleAgent:
 
 
 def evaluate_case(agent: SingleAgent, case: dict[str, Any]) -> dict[str, Any]:
+    started_at = time.perf_counter()
     result = agent.run(case["question"])
+    latency_ms = round((time.perf_counter() - started_at) * 1000, 2)
     trace_text = json.dumps(result["trace"], ensure_ascii=False)
     answer_text = result["answer"]
     sources_text = json.dumps(result["sources"], ensure_ascii=False)
@@ -66,7 +69,21 @@ def evaluate_case(agent: SingleAgent, case: dict[str, Any]) -> dict[str, Any]:
         for keyword in expected_keywords
     }
     keyword_hit = all(keyword_hits.values())
-    passed = tool_hit and keyword_hit
+
+    expected_sources = case.get("expected_sources", [])
+    returned_sources = sorted(
+        {
+            str(source.get("source", ""))
+            for source in result.get("sources", [])
+            if isinstance(source, dict) and source.get("source")
+        }
+    )
+    source_hits = {
+        source: any(source.lower() in returned.lower() for returned in returned_sources)
+        for source in expected_sources
+    }
+    source_hit = all(source_hits.values()) if expected_sources else True
+    passed = tool_hit and keyword_hit and source_hit
 
     return {
         "question": case["question"],
@@ -74,8 +91,12 @@ def evaluate_case(agent: SingleAgent, case: dict[str, Any]) -> dict[str, Any]:
         "tool_hit": tool_hit,
         "keyword_hit": keyword_hit,
         "keyword_hits": keyword_hits,
+        "source_hit": source_hit,
+        "source_hits": source_hits,
         "expected_tool": expected_tool,
         "actual_tools": [step.get("tool") for step in result["trace"]],
+        "returned_sources": returned_sources,
+        "latency_ms": latency_ms,
         "usage": result.get("usage", {}),
         "run_id": result.get("run_id"),
     }
@@ -102,10 +123,26 @@ def main():
     cases = load_eval_cases(args.eval_file)
     results = [evaluate_case(agent, case) for case in cases]
     passed = sum(1 for result in results if result["passed"])
+    total_usage = {
+        "input_tokens": sum(result.get("usage", {}).get("input_tokens", 0) for result in results),
+        "output_tokens": sum(result.get("usage", {}).get("output_tokens", 0) for result in results),
+        "total_tokens": sum(result.get("usage", {}).get("total_tokens", 0) for result in results),
+        "estimated_cost_usd": round(
+            sum(result.get("usage", {}).get("estimated_cost_usd", 0.0) for result in results),
+            8,
+        ),
+    }
+    avg_latency_ms = (
+        sum(result["latency_ms"] for result in results) / len(results)
+        if results
+        else 0.0
+    )
     report = {
         "total": len(results),
         "passed": passed,
         "pass_rate": passed / len(results) if results else 0.0,
+        "avg_latency_ms": round(avg_latency_ms, 2),
+        "total_usage": total_usage,
         "results": results,
     }
 

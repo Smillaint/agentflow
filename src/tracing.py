@@ -32,3 +32,15 @@ class TraceStore:
         lines = self.trace_file.read_text(encoding="utf-8").splitlines()
         records = [json.loads(line) for line in lines[-limit:] if line.strip()]
         return list(reversed(records))
+
+    def get(self, run_id: str) -> dict[str, Any] | None:
+        if not self.trace_file.exists():
+            return None
+        with self.trace_file.open("r", encoding="utf-8") as file:
+            for line in file:
+                if not line.strip():
+                    continue
+                record = json.loads(line)
+                if record.get("run_id") == run_id:
+                    return record
+        return None

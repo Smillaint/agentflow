@@ -355,6 +355,16 @@ pre {
   font-weight: 650;
 }
 
+.run-item .replay-button {
+  width: auto;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  padding: 5px 8px;
+  color: var(--accent-2);
+  background: #f6f9ff;
+  font-size: 12px;
+}
+
 .run-item small {
   display: block;
   color: var(--muted);

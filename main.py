@@ -37,7 +37,7 @@ def build_agent(args):
     from src.agent import AgentConfig, SingleAgent
     from src.generator import build_generator
     from src.loader import load_knowledge_base
-    from src.retriever import BM25Retriever
+    from src.retriever import HybridRetriever
     from src.tools import build_default_registry
 
     chunks = load_knowledge_base(
@@ -45,7 +45,7 @@ def build_agent(args):
         chunk_size=args.chunk_size,
         chunk_overlap=args.chunk_overlap,
     )
-    retriever = BM25Retriever(chunks)
+    retriever = HybridRetriever(chunks)
     registry = build_default_registry(chunks, retriever)
     generator = build_generator()
     return SingleAgent(

@@ -59,6 +59,8 @@ const messages = {
     noSources: "No sources returned.",
     noTrace: "No trace steps.",
     noRuns: "No runs yet.",
+    replay: "Replay",
+    replayed: "Replayed",
     runningText: "Running agent workflow...",
     steps: "steps",
     step: "step",
@@ -102,6 +104,8 @@ const messages = {
     noSources: "没有返回来源。",
     noTrace: "没有 trace 步骤。",
     noRuns: "暂无运行记录。",
+    replay: "回放",
+    replayed: "已回放",
     runningText: "正在运行 Agent 工作流...",
     steps: "步",
     step: "步骤",
@@ -244,6 +248,9 @@ function renderTraceList(records) {
         <button type="button" data-run='${escapeHtml(JSON.stringify(record))}'>
           ${escapeHtml(record.query || "Untitled run")}
         </button>
+        <button type="button" class="replay-button" data-replay-id="${escapeHtml(record.run_id || "")}">
+          ${t("replay")}
+        </button>
         <small>${escapeHtml(record.run_id || "")}</small>
       </div>
     `)
@@ -254,6 +261,31 @@ function renderTraceList(records) {
       const record = JSON.parse(button.dataset.run);
       renderResult(record);
       setState("loaded", "done");
+    });
+  });
+
+  traceList.querySelectorAll("button[data-replay-id]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const runId = button.dataset.replayId;
+      if (!runId) {
+        return;
+      }
+      setState("running", "running");
+      try {
+        const payload = await requestJson(`/replay/${encodeURIComponent(runId)}`, {
+          method: "POST",
+        });
+        renderResult(payload.replay);
+        traceOutput.insertAdjacentHTML(
+          "afterbegin",
+          `<div class="trace-step"><div class="trace-meta"><span class="tag">${t("replayed")}</span></div><pre>${escapeHtml(JSON.stringify(payload.comparison, null, 2))}</pre></div>`,
+        );
+        setState("replayed", "done");
+        await loadTraces();
+      } catch (error) {
+        setState("error", "error");
+        answerOutput.textContent = error.message;
+      }
     });
   });
 }

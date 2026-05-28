@@ -15,6 +15,7 @@ class DocumentChunk:
 class RetrievalResult:
     chunk: DocumentChunk
     score: float
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

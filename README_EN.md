@@ -9,7 +9,7 @@ Chinese documentation: [README.zh-CN.md](README.zh-CN.md)
 Stage 1:
 
 - Local knowledge loading for `.txt`, `.md`, `.py`, `.json`, `.csv`, `.log`, and `.pdf`.
-- BM25 retrieval with source metadata.
+- Hybrid BM25 + char n-gram TF-IDF retrieval with source metadata and score details.
 - Tool calling through a central `ToolRegistry`.
 - Single-Agent workflow with planning, tool execution, answer generation, trace output, and sources.
 - FastAPI endpoints for `/health`, `/stats`, `/agent`.
@@ -18,6 +18,7 @@ Stage 1:
 Stage 2:
 
 - JSONL trace persistence with `run_id`, query, answer, trace, sources, and usage.
+- Trace replay by `run_id`, with tool-path comparison, source overlap, and usage delta.
 - Eval runner with JSONL cases, expected tool checks, keyword checks, and pass rate.
 - Tool failure retry with every attempt recorded in trace.
 - Token and estimated cost accounting.
@@ -44,7 +45,7 @@ src/
   evaluate.py    Eval runner
   generator.py   Local fallback and OpenAI-compatible generation
   loader.py      Local file loading and chunking
-  retriever.py   BM25 retrieval
+  retriever.py   Hybrid BM25 + lexical vector retrieval
   schema.py      Core data structures
   tools.py       Tool registry and built-in tools
   tracing.py     JSONL trace persistence

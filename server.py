@@ -13,7 +13,7 @@ from main import load_local_env
 from src.agent import AgentConfig, SingleAgent
 from src.generator import build_generator
 from src.loader import load_knowledge_base
-from src.retriever import BM25Retriever
+from src.retriever import HybridRetriever
 from src.tools import build_default_registry
 
 
@@ -31,6 +31,12 @@ class AgentResponse(BaseModel):
     trace_path: str | None = None
 
 
+class ReplayResponse(BaseModel):
+    original: dict[str, Any]
+    replay: dict[str, Any]
+    comparison: dict[str, Any]
+
+
 agent: SingleAgent | None = None
 chunks_count = 0
 BASE_DIR = Path(__file__).resolve().parent
@@ -46,7 +52,7 @@ def build_agent() -> SingleAgent:
         chunk_overlap=int(os.getenv("AGENT_CHUNK_OVERLAP", "100")),
     )
     chunks_count = len(chunks)
-    retriever = BM25Retriever(chunks)
+    retriever = HybridRetriever(chunks)
     registry = build_default_registry(chunks, retriever)
     return SingleAgent(
         registry,
@@ -132,6 +138,58 @@ def traces(limit: int = 20) -> dict:
     if current_agent.trace_store is None:
         return {"traces": []}
     return {"traces": current_agent.trace_store.list_recent(limit=limit)}
+
+
+def _tools_from_trace(record: dict[str, Any]) -> list[str]:
+    return [step.get("tool", "") for step in record.get("trace", [])]
+
+
+def _chunk_ids(record: dict[str, Any]) -> set[str]:
+    return {
+        str(source.get("chunk_id"))
+        for source in record.get("sources", [])
+        if isinstance(source, dict) and source.get("chunk_id")
+    }
+
+
+def _compare_runs(original: dict[str, Any], replay: dict[str, Any]) -> dict[str, Any]:
+    original_chunks = _chunk_ids(original)
+    replay_chunks = _chunk_ids(replay)
+    overlap = original_chunks & replay_chunks
+    union = original_chunks | replay_chunks
+    original_usage = original.get("usage", {})
+    replay_usage = replay.get("usage", {})
+    return {
+        "same_tools": _tools_from_trace(original) == _tools_from_trace(replay),
+        "original_tools": _tools_from_trace(original),
+        "replay_tools": _tools_from_trace(replay),
+        "source_overlap": sorted(overlap),
+        "source_jaccard": round(len(overlap) / len(union), 4) if union else 1.0,
+        "total_token_delta": (
+            replay_usage.get("total_tokens", 0) - original_usage.get("total_tokens", 0)
+        ),
+        "estimated_cost_delta_usd": round(
+            replay_usage.get("estimated_cost_usd", 0.0)
+            - original_usage.get("estimated_cost_usd", 0.0),
+            8,
+        ),
+    }
+
+
+@app.post("/replay/{run_id}", response_model=ReplayResponse)
+def replay_run(run_id: str) -> dict:
+    current_agent = get_agent()
+    if current_agent.trace_store is None:
+        raise HTTPException(status_code=404, detail="Trace persistence is disabled.")
+    original = current_agent.trace_store.get(run_id)
+    if original is None:
+        raise HTTPException(status_code=404, detail=f"Run not found: {run_id}")
+    replay = current_agent.run(str(original.get("query", "")))
+    return {
+        "original": original,
+        "replay": replay,
+        "comparison": _compare_runs(original, replay),
+    }
 
 
 @app.post("/agent", response_model=AgentResponse)
