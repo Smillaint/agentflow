@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -112,13 +113,21 @@ def parse_args():
     parser.add_argument("--max-tool-retries", type=int, default=1)
     parser.add_argument("--trace-dir", default="./runs/eval_traces")
     parser.add_argument("--no-persist-traces", action="store_true")
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        help="Disable external model calls for deterministic local/CI evaluation.",
+    )
     parser.add_argument("--report-file", default="")
     return parser.parse_args()
 
 
 def main():
-    load_local_env()
     args = parse_args()
+    if args.local_only:
+        os.environ.pop("OPENAI_API_KEY", None)
+    else:
+        load_local_env()
     agent = build_agent(args)
     cases = load_eval_cases(args.eval_file)
     results = [evaluate_case(agent, case) for case in cases]
