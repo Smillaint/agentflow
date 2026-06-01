@@ -46,6 +46,12 @@ class AgentWorkflowTest(unittest.TestCase):
         self.assertGreaterEqual(output["source_count"], 1)
         self.assertEqual(result["usage"]["model"], "local-extractive")
 
+    def test_chinese_stats_query_uses_stats_tool(self):
+        agent = self.build_agent()
+        result = agent.run("当前知识库有多少文档？")
+
+        self.assertEqual(result["trace"][0]["tool"], "get_corpus_stats")
+
     def test_trace_persistence_adds_run_metadata(self):
         chunks = load_knowledge_base("./examples/knowledge")
         retriever = HybridRetriever(chunks)
