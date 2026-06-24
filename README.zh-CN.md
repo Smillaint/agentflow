@@ -1,6 +1,6 @@
 # AgentFlow MVP 中文说明
 
-AgentFlow 是一个面向简历项目的本地 RAG + 工具调用 Agent 项目,是一个带检索、工具调用、trace、评测、成本统计和前端控制台的 Agent 后端原型。
+AgentFlow 是一个面向本地知识库的可观测单 Agent 工作流原型，覆盖混合检索、工具路由、答案生成、执行追踪、回放和自动评测。
 
 ## 当前能力
 
@@ -9,7 +9,7 @@ AgentFlow 是一个面向简历项目的本地 RAG + 工具调用 Agent 项目,�
 - 使用 BM25 做关键词检索。
 - 使用 BM25 + 字符 n-gram TF-IDF 做混合检索，并返回每个 chunk 的分数解释。
 - 通过 `ToolRegistry` 统一管理工具。
-- 单 Agent 工作流：规划、工具调用、答案生成、trace 输出。
+- 单 Agent 工作流：确定性路由、工具调用、答案生成、trace 输出。
 - FastAPI 接口：`/health`、`/stats`、`/agent`。
 
 - 每次运行保存 JSONL trace。
@@ -116,7 +116,7 @@ OPENAI_MODEL=deepseek-chat
 
 如果模型调用失败，系统不会直接崩溃，而是：
 
-1. 回退到本地 extractive answer。
+1. 回退到基于检索证据的摘录式回答。
 2. 在 trace 里记录 `answer_generator` 错误步骤。
 3. 前端仍然能看到 sources、trace 和 usage。
 

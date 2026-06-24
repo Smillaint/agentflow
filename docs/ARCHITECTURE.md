@@ -27,7 +27,7 @@ Local files
 - `src.evaluate` 把 eval case 和真实 Agent run 打通，先覆盖工具选择和关键词命中。
 - `UsageStats` 当前采用轻量 token/cost 估算，接入模型后会优先读取 API usage。
 - `AnswerGenerator` uses a grounded prompt that requires chunk_id citations and refuses unsupported facts.
-- Model errors are captured as an `answer_generator` trace step, then the system falls back to local extractive output.
+- Model errors are captured as an `answer_generator` trace step, then the system falls back to local evidence excerpts.
 - The web console exposes provider, model, LLM status, usage, trace, and bilingual UI switching.
 
 ## Stage 2 Runtime Record
@@ -53,8 +53,8 @@ Each run returns and persists:
 
 ## Extension Points
 
-- `src/retriever.py`：替换或叠加 embedding、reranker、向量库，也可以调整 BM25/vector fusion 权重。
+- `src/retriever.py`：当前是 BM25 + 字符 n-gram TF-IDF 的词法混合检索；后续可以替换或叠加 embedding、reranker、向量库，也可以调整 BM25/n-gram fusion 权重。
 - `src/tools.py`：添加真实业务工具。
-- `src/agent.py`：升级为多步骤 planner、预算控制、人工确认。
+- `src/agent.py`：当前是确定性规则路由；后续可以升级为 LLM function calling、多步骤 planner、预算控制、人工确认。
 - `src/generator.py`：增加模型路由、fallback、结构化输出。
 - `src/evaluate.py`：增加 Recall@K、MRR、faithfulness、trace-level grading。

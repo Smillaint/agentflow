@@ -1,6 +1,6 @@
 ﻿# AgentFlow MVP
 
-AgentFlow is a resume-oriented local RAG + tool-calling Agent project. The goal is not a simple chatbot demo, but a testable Agent backend with traceability, evaluation, usage accounting, and a small operations console.
+AgentFlow is an observable single-agent workflow prototype for local knowledge bases. It combines hybrid lexical retrieval, deterministic tool routing, answer generation, execution tracing, replay, and automated evaluation.
 
 Chinese documentation: [README.zh-CN.md](README.zh-CN.md)
 
@@ -11,7 +11,7 @@ Stage 1:
 - Local knowledge loading for `.txt`, `.md`, `.py`, `.json`, `.csv`, `.log`, and `.pdf`.
 - Hybrid BM25 + char n-gram TF-IDF retrieval with source metadata and score details.
 - Tool calling through a central `ToolRegistry`.
-- Single-Agent workflow with planning, tool execution, answer generation, trace output, and sources.
+- Single-agent workflow with deterministic routing, tool execution, answer generation, trace output, and sources.
 - FastAPI endpoints for `/health`, `/stats`, `/agent`.
 - Core tests that do not require an external LLM.
 
@@ -45,7 +45,7 @@ src/
   evaluate.py    Eval runner
   generator.py   Local fallback and OpenAI-compatible generation
   loader.py      Local file loading and chunking
-  retriever.py   Hybrid BM25 + lexical vector retrieval
+  retriever.py   Hybrid BM25 + char n-gram TF-IDF retrieval
   schema.py      Core data structures
   tools.py       Tool registry and built-in tools
   tracing.py     JSONL trace persistence
@@ -118,7 +118,7 @@ http://127.0.0.1:8010/docs
 
 ## Optional LLM Configuration
 
-Without an API key, AgentFlow uses a local extractive fallback. To enable DeepSeek, OpenAI, or another OpenAI-compatible API:
+Without an API key, AgentFlow uses a local evidence-excerpt fallback. To enable DeepSeek, OpenAI, or another OpenAI-compatible API:
 
 ```text
 OPENAI_API_KEY=your_key
@@ -128,7 +128,7 @@ OPENAI_MODEL=deepseek-chat
 
 AgentFlow detects the provider from `OPENAI_BASE_URL` and `OPENAI_MODEL`. With `https://api.deepseek.com` and `deepseek-chat`, the UI will show provider `deepseek`.
 
-If the model request fails, AgentFlow falls back to the local extractive answer and records the model error in trace as an `answer_generator` step.
+If the model request fails, AgentFlow falls back to local evidence excerpts and records the model error in trace as an `answer_generator` step.
 
 ## Evaluation
 
