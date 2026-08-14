@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from src.mcp_client import MCPClient
 from src.schema import DocumentChunk, ToolResult
 
 
@@ -122,6 +123,91 @@ def build_default_registry(chunks: list[DocumentChunk], retriever) -> ToolRegist
         ToolSpec(
             name="get_corpus_stats",
             description="Return loaded source and chunk statistics.",
+            parameters={},
+            handler=get_corpus_stats,
+        )
+    )
+    return registry
+
+
+def build_mcp_registry(client: MCPClient) -> ToolRegistry:
+    """Build a ToolRegistry backed by a remote TraceRAG MCP server.
+
+    Tool names deliberately match :func:`build_default_registry`
+    (``search_knowledge_base`` and ``get_corpus_stats``) so that
+    :class:`src.agent.SingleAgent` routing works unchanged. Retrieval
+    delegates to TraceRAG's hybrid vector + BM25 (RRF) + HyDE +
+    CrossEncoder reranking pipeline over MCP.
+    """
+    registry = ToolRegistry()
+
+    def search_knowledge_base(arguments: dict[str, Any]) -> ToolResult:
+        query = str(arguments.get("query", "")).strip()
+        top_k = _as_int(arguments.get("top_k"), 4, 1, 20)
+        collection = arguments.get("collection")
+        if not query:
+            return ToolResult(
+                name="search_knowledge_base",
+                output={"sources": []},
+                error="query is required",
+            )
+        result = client.call_tool(
+            "rag_search",
+            {
+                "query": query,
+                "retrieve_top_k": max(top_k, 5),
+                "rerank_top_k": top_k,
+                "collection": collection,
+            },
+        )
+        if "error" in result:
+            return ToolResult(
+                name="search_knowledge_base",
+                output={"sources": []},
+                error=result["error"],
+            )
+        sources = result.get("sources", [])
+        return ToolResult(
+            name="search_knowledge_base",
+            output={
+                "query": query,
+                "top_k": top_k,
+                "retrieval_mode": "mcp_tracerag_hybrid",
+                "collection": collection,
+                "sources": sources,
+                "retrieval_trace": result.get("trace"),
+                "source_count": result.get("source_count", len(sources)),
+            },
+        )
+
+    def get_corpus_stats(arguments: dict[str, Any]) -> ToolResult:
+        result = client.call_tool("rag_corpus_stats", {})
+        if "error" in result:
+            return ToolResult(name="get_corpus_stats", output={}, error=result["error"])
+        return ToolResult(
+            name="get_corpus_stats",
+            output={
+                "chunk_count": result.get("chunk_count", 0),
+                "source_count": result.get("source_count", 0),
+                "sources": result.get("sources", []),
+                "collections": result.get("collections", []),
+                "embedding_model": result.get("embedding_model"),
+                "generation_model": result.get("generation_model"),
+            },
+        )
+
+    registry.register(
+        ToolSpec(
+            name="search_knowledge_base",
+            description="Search the TraceRAG PDF knowledge base via MCP: vector + BM25 hybrid (RRF), HyDE, CrossEncoder reranking.",
+            parameters={"query": "string", "top_k": "integer", "collection": "string|None"},
+            handler=search_knowledge_base,
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="get_corpus_stats",
+            description="Return corpus, chunk, and model statistics from the TraceRAG backend via MCP.",
             parameters={},
             handler=get_corpus_stats,
         )

@@ -2,3 +2,4 @@ fastapi
 uvicorn
 openai
 pymupdf
+mcp>=2.0

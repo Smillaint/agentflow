@@ -104,7 +104,7 @@ def evaluate_case(agent: SingleAgent, case: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate AgentFlow workflow quality.")
+    parser = argparse.ArgumentParser(description="Evaluate TraceFlow workflow quality.")
     parser.add_argument("--eval-file", default="./examples/eval_questions.jsonl")
     parser.add_argument("--data-dir", default="./examples/knowledge")
     parser.add_argument("--chunk-size", type=int, default=700)

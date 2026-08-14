@@ -80,7 +80,7 @@ class AnswerGenerator:
         if not sources:
             answer = "No sufficiently relevant content was found in the local knowledge base."
             if fallback_reason:
-                answer = f"Model generation failed, so AgentFlow used local fallback.\n\n{answer}"
+                answer = f"Model generation failed, so TraceFlow used local fallback.\n\n{answer}"
             return GenerationResult(
                 answer=answer,
                 usage=estimate_usage(self.model_name, query, answer),
@@ -88,7 +88,7 @@ class AnswerGenerator:
 
         lines = []
         if fallback_reason:
-            lines.append("Model generation failed, so AgentFlow used local fallback.")
+            lines.append("Model generation failed, so TraceFlow used local fallback.")
             lines.append("")
         lines.append("Retrieved evidence from the local knowledge base:")
         for index, source in enumerate(sources[:4], start=1):
@@ -152,7 +152,7 @@ class AnswerGenerator:
                 {
                     "role": "system",
                     "content": (
-                        "You are AgentFlow's grounded answer generator. You must answer "
+                        "You are TraceFlow's grounded answer generator. You must answer "
                         "only from the retrieved sources. Do not use outside knowledge. "
                         "Cite chunk_id values exactly as provided, for example "
                         "[agentflow.md:c0]. If the answer cannot be fully supported, "

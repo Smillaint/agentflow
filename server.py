@@ -39,6 +39,7 @@ class ReplayResponse(BaseModel):
 
 agent: SingleAgent | None = None
 chunks_count = 0
+mcp_client: Any = None
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 
@@ -46,6 +47,23 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 def build_agent() -> SingleAgent:
     global chunks_count
     load_local_env()
+    config = AgentConfig(
+        max_tool_retries=int(os.getenv("AGENT_MAX_TOOL_RETRIES", "1")),
+        trace_dir=os.getenv("AGENT_TRACE_DIR", "./runs/traces"),
+        persist_traces=os.getenv("AGENT_PERSIST_TRACES", "true").lower() != "false",
+    )
+
+    mcp_url = os.getenv("AGENT_MCP_URL", "").strip()
+    if mcp_url:
+        global mcp_client
+        from src.mcp_client import MCPClient
+        from src.tools import build_mcp_registry
+
+        client = MCPClient(mcp_url)
+        mcp_client = client
+        registry = build_mcp_registry(client)
+        return SingleAgent(registry, build_generator(), config)
+
     chunks = load_knowledge_base(
         os.getenv("AGENT_DATA_DIR", "./examples/knowledge"),
         chunk_size=int(os.getenv("AGENT_CHUNK_SIZE", "700")),
@@ -54,15 +72,7 @@ def build_agent() -> SingleAgent:
     chunks_count = len(chunks)
     retriever = HybridRetriever(chunks)
     registry = build_default_registry(chunks, retriever)
-    return SingleAgent(
-        registry,
-        build_generator(),
-        AgentConfig(
-            max_tool_retries=int(os.getenv("AGENT_MAX_TOOL_RETRIES", "1")),
-            trace_dir=os.getenv("AGENT_TRACE_DIR", "./runs/traces"),
-            persist_traces=os.getenv("AGENT_PERSIST_TRACES", "true").lower() != "false",
-        ),
-    )
+    return SingleAgent(registry, build_generator(), config)
 
 
 @asynccontextmanager
@@ -74,9 +84,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="AgentFlow MVP API",
-    description="RAG, tool calling, and single-agent workflow service.",
-    version="0.1.0",
+    title="TraceFlow API",
+    description="Observable single-agent RAG workflow with tool routing, trace, and replay.",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -105,7 +115,13 @@ def health() -> dict:
 
 @app.get("/stats")
 def stats() -> dict:
+    global chunks_count
     current_agent = get_agent()
+    remote_stats: dict[str, Any] = {}
+    if mcp_client is not None:
+        remote_stats = mcp_client.call_tool("rag_corpus_stats", {})
+        if "error" not in remote_stats:
+            chunks_count = remote_stats.get("chunk_count", 0)
     return {
         "chunk_count": chunks_count,
         "tools": current_agent.registry.tool_names(),
@@ -116,6 +132,8 @@ def stats() -> dict:
             else None
         ),
         "llm": current_agent.generator.config(),
+        "backend": "mcp_tracerag" if mcp_client is not None else "local",
+        "remote": remote_stats if mcp_client is not None else None,
     }
 
 

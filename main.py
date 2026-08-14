@@ -20,7 +20,7 @@ def load_local_env(path: str = ".env") -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run the AgentFlow MVP workflow.")
+    parser = argparse.ArgumentParser(description="Run the TraceFlow workflow.")
     parser.add_argument("query", nargs="?", help="Question to ask. If omitted, starts interactive mode.")
     parser.add_argument("--data-dir", default="./examples/knowledge", help="Directory containing knowledge files.")
     parser.add_argument("--chunk-size", type=int, default=700, help="Maximum characters per chunk.")
@@ -30,12 +30,32 @@ def parse_args():
     parser.add_argument("--trace-dir", default="./runs/traces", help="Directory for JSONL trace records.")
     parser.add_argument("--no-persist-traces", action="store_true", help="Disable trace persistence.")
     parser.add_argument("--show-trace", action="store_true", help="Print tool-call trace as JSON.")
+    parser.add_argument(
+        "--mcp-url",
+        default="",
+        help="TraceRAG MCP server URL (e.g. http://127.0.0.1:8010/mcp). When set, retrieval delegates to the remote TraceRAG backend over MCP instead of loading the local knowledge base.",
+    )
     return parser.parse_args()
 
 
 def build_agent(args):
     from src.agent import AgentConfig, SingleAgent
     from src.generator import build_generator
+
+    config = AgentConfig(
+        top_k=args.top_k,
+        max_tool_retries=args.max_tool_retries,
+        trace_dir=args.trace_dir,
+        persist_traces=not args.no_persist_traces,
+    )
+
+    if args.mcp_url:
+        from src.mcp_client import MCPClient
+        from src.tools import build_mcp_registry
+
+        registry = build_mcp_registry(MCPClient(args.mcp_url))
+        return SingleAgent(registry, build_generator(), config)
+
     from src.loader import load_knowledge_base
     from src.retriever import HybridRetriever
     from src.tools import build_default_registry
@@ -47,17 +67,7 @@ def build_agent(args):
     )
     retriever = HybridRetriever(chunks)
     registry = build_default_registry(chunks, retriever)
-    generator = build_generator()
-    return SingleAgent(
-        registry,
-        generator,
-        AgentConfig(
-            top_k=args.top_k,
-            max_tool_retries=args.max_tool_retries,
-            trace_dir=args.trace_dir,
-            persist_traces=not args.no_persist_traces,
-        ),
-    )
+    return SingleAgent(registry, build_generator(), config)
 
 
 def print_result(result: dict, show_trace: bool) -> None:
